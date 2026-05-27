@@ -25,12 +25,12 @@ export async function ensureDemoUser() {
 
 export async function loginTeacher(input: LoginInput) {
   const user = await UserModel.findOne({ email: input.email.toLowerCase() });
-  if (!user) {
-    throw new AppError("Invalid email or password", 401, "AUTH_INVALID");
-  }
-
-  const isValid = await bcrypt.compare(input.password, user.passwordHash);
-  if (!isValid) {
+  
+  // Use a dummy hash to prevent timing attacks if email is not found
+  const dummyHash = "$2a$12$R9h/lIPzMRFh41x7CmyJJuD.X9Zz.aOpCS.45y324213asdf";
+  const isValid = await bcrypt.compare(input.password, user ? user.passwordHash : dummyHash);
+  
+  if (!user || !isValid) {
     throw new AppError("Invalid email or password", 401, "AUTH_INVALID");
   }
 
@@ -39,7 +39,8 @@ export async function loginTeacher(input: LoginInput) {
       sub: user._id.toString(),
       email: user.email,
       name: user.name,
-      schoolName: user.schoolName
+      schoolName: user.schoolName,
+      role: user.role
     },
     env.JWT_SECRET,
     { expiresIn: env.JWT_EXPIRES_IN as any }
@@ -56,3 +57,51 @@ export async function loginTeacher(input: LoginInput) {
     token
   };
 }
+
+interface RegisterInput {
+  email: string;
+  password: any;
+  name: string;
+  schoolName: string;
+}
+
+export async function registerTeacher(input: RegisterInput) {
+  const email = input.email.toLowerCase();
+  const existing = await UserModel.findOne({ email });
+  if (existing) {
+    throw new AppError("Email is already registered", 400, "EMAIL_EXISTS");
+  }
+
+  const passwordHash = await bcrypt.hash(input.password, 12);
+  const user = await UserModel.create({
+    email,
+    passwordHash,
+    name: input.name,
+    role: "teacher",
+    schoolName: input.schoolName
+  });
+
+  const token = jwt.sign(
+    {
+      sub: user._id.toString(),
+      email: user.email,
+      name: user.name,
+      schoolName: user.schoolName,
+      role: user.role
+    },
+    env.JWT_SECRET,
+    { expiresIn: env.JWT_EXPIRES_IN as any }
+  );
+
+  return {
+    user: {
+      id: user._id.toString(),
+      email: user.email,
+      name: user.name,
+      schoolName: user.schoolName,
+      role: user.role
+    },
+    token
+  };
+}
+
