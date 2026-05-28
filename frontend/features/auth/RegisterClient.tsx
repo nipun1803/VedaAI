@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
-import toast from "react-hook-form";
 import { ArrowRight, LockKeyhole, Mail, Sparkles, User, School, KeyRound } from "lucide-react";
 import { z } from "zod";
 import { Logo } from "@/components/brand/Logo";

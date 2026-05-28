@@ -78,3 +78,26 @@ export async function invalidateTeacherAssignments(teacherId: string) {
     // Cache deletions are non-critical.
   }
 }
+
+const GROUP_LIST_TTL = 120;
+
+export async function getCachedGroupList<T>(teacherId: string, archived: boolean) {
+  return getCached<T>(key(`groups-list:${archived}`, teacherId));
+}
+
+export async function setCachedGroupList(teacherId: string, archived: boolean, data: unknown) {
+  await setCache(key(`groups-list:${archived}`, teacherId), data, GROUP_LIST_TTL);
+}
+
+export async function invalidateTeacherGroups(teacherId: string) {
+  try {
+    const redis = getRedisConnection();
+    const pattern = `vedai:cache:groups-list:*:${teacherId}`;
+    const keys = await redis.keys(pattern);
+    if (keys.length > 0) {
+      await redis.del(...keys);
+    }
+  } catch {
+    // Cache deletions are non-critical.
+  }
+}

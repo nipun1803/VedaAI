@@ -5,6 +5,7 @@ import { JobModel } from "@/models/Job.model.js";
 import { PDF_QUEUE_NAME, type PdfJobData } from "@/queues/generation.queue.js";
 import { savePdfToPaper } from "@/services/pdf.service.js";
 import { publishGenerationUpdate } from "@/sockets/progressChannel.js";
+import { invalidateAssignment, invalidatePaper, invalidateTeacherAssignments } from "@/services/cache.service.js";
 
 export function createPdfWorker() {
   return new Worker<PdfJobData>(
@@ -26,10 +27,17 @@ export function createPdfWorker() {
         });
 
         await savePdfToPaper(paperId);
-        await AssignmentModel.findByIdAndUpdate(assignmentId, {
+        
+        const assignment = await AssignmentModel.findByIdAndUpdate(assignmentId, {
           status: "completed",
           lastError: undefined
         });
+
+        if (assignment) {
+          await invalidateAssignment(assignmentId);
+          await invalidatePaper(assignmentId);
+          await invalidateTeacherAssignments(assignment.teacherId);
+        }
 
         await JobModel.findOneAndUpdate(
           { bullJobId: job.id, queueName: PDF_QUEUE_NAME },
@@ -47,10 +55,16 @@ export function createPdfWorker() {
           paperId
         };
       } catch (error) {
-        await AssignmentModel.findByIdAndUpdate(assignmentId, {
+        const assignment = await AssignmentModel.findByIdAndUpdate(assignmentId, {
           status: "failed",
           lastError: error instanceof Error ? error.message : String(error)
         });
+
+        if (assignment) {
+          await invalidateAssignment(assignmentId);
+          await invalidatePaper(assignmentId);
+          await invalidateTeacherAssignments(assignment.teacherId);
+        }
 
         await JobModel.findOneAndUpdate(
           { bullJobId: job.id, queueName: PDF_QUEUE_NAME },
@@ -77,4 +91,3 @@ export function createPdfWorker() {
     }
   );
 }
-

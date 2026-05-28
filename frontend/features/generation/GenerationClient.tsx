@@ -7,11 +7,12 @@ import { Bot, CheckCircle2, CircleDashed, FileText, Loader2, RotateCcw } from "l
 import { AppShell } from "@/components/layout/AppShell";
 import { Button } from "@/components/ui/Button";
 import { Skeleton } from "@/components/ui/Skeleton";
+import toast from "react-hot-toast";
 import { useGenerationSimulator } from "@/hooks/useGenerationSimulator";
 import { useMounted } from "@/hooks/useMounted";
 import { useSocketBridge } from "@/hooks/useSocketBridge";
 import { isDemoMode } from "@/lib/env";
-import { getAssignmentRequest, getJobStatusRequest } from "@/services/api";
+import { getAssignmentRequest, getJobStatusRequest, regenerateAssignmentRequest } from "@/services/api";
 import { useAssignmentStore } from "@/store/assignmentStore";
 import type { GenerationStage } from "@/types/assignment";
 
@@ -30,10 +31,56 @@ export function GenerationClient({ assignmentId }: { assignmentId: string }) {
   const paper = useAssignmentStore((state) => state.getPaper(assignmentId));
   const saveAssignment = useAssignmentStore((state) => state.saveAssignment);
   const savePaper = useAssignmentStore((state) => state.savePaper);
+  const updateAssignmentStatus = useAssignmentStore((state) => state.updateAssignmentStatus);
+  const setGenerationStatus = useAssignmentStore((state) => state.setGenerationStatus);
   const [isFetchingRemote, setIsFetchingRemote] = useState(false);
+  const [isRegenerating, setIsRegenerating] = useState(false);
 
   useSocketBridge(assignmentId);
   useGenerationSimulator(assignmentId);
+
+  function handleRegenerate() {
+    if (!assignment) return;
+    setIsRegenerating(true);
+    
+    if (!isDemoMode) {
+      regenerateAssignmentRequest(assignment.id)
+        .then((updated) => {
+          saveAssignment(updated);
+          // Reset progress states
+          setGenerationStatus({
+            assignmentId,
+            stage: "queued",
+            progress: 8,
+            message: "Regeneration queued",
+            logs: ["Regeneration queued by user"]
+          });
+          updateAssignmentStatus(assignment.id, "queued");
+          toast.success("Regeneration queued successfully");
+        })
+        .catch(() => {
+          toast.error("Could not queue regeneration");
+        })
+        .finally(() => {
+          setIsRegenerating(false);
+        });
+      return;
+    }
+
+    // Demo Mode fallback
+    setTimeout(() => {
+      updateAssignmentStatus(assignment.id, "generating");
+      setGenerationStatus({
+        assignmentId,
+        stage: "queued",
+        progress: 8,
+        message: "Starting simulation...",
+        logs: ["Simulating generation in demo mode"]
+      });
+      setIsRegenerating(false);
+      toast.success("Simulation restarted");
+    }, 500);
+  }
 
   useEffect(() => {
     if (!mounted || assignment || isDemoMode) return;
@@ -88,78 +135,117 @@ export function GenerationClient({ assignmentId }: { assignmentId: string }) {
         </div>
       ) : (
         <div className="grid gap-5 xl:grid-cols-[1fr_380px]">
-          <section className="overflow-hidden rounded-3xl bg-white shadow-sm dark:bg-[#232323]">
-            <div className="bg-ink p-6 text-white dark:bg-white dark:text-ink sm:p-8">
-              <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <p className="text-sm font-semibold opacity-70">VedaAI generation pipeline</p>
-                  <h2 className="mt-2 text-2xl font-black sm:text-3xl">{assignment.title}</h2>
-                  <p className="mt-2 text-sm opacity-70">
-                    {assignment.subject} · {assignment.grade}
+          {status.stage === "failed" || assignment.status === "failed" ? (
+            <section className="overflow-hidden rounded-[32px] border border-danger/10 bg-white p-8 text-center shadow-card dark:border-white/10 dark:bg-[#232323] dark:text-white sm:p-12 flex flex-col items-center justify-center">
+              <div className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-danger/10 text-danger mb-6 dark:bg-danger/25">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-8 h-8">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+                </svg>
+              </div>
+              <h2 className="text-2xl font-black text-ink dark:text-white">Generation Failed</h2>
+              <p className="mt-3 text-sm text-neutral-500 dark:text-neutral-400 max-w-md">
+                We encountered an unexpected error while generating your assessment paper. You can see the detailed trail in the Worker Logs on the right.
+              </p>
+              {assignment.lastError && (
+                <div className="mt-5 rounded-2xl bg-danger/5 p-4 border border-danger/10 text-left w-full max-w-lg dark:bg-danger/10 dark:border-danger/20">
+                  <p className="text-xs font-mono text-danger break-words leading-relaxed">
+                    {assignment.lastError}
                   </p>
                 </div>
-                <ProgressOrb progress={status.assignmentId === assignmentId ? status.progress : 8} />
-              </div>
-            </div>
-
-            <div className="p-6 sm:p-8">
-              <div className="mb-8 rounded-3xl bg-neutral-50 p-4 dark:bg-white/6">
-                <div className="mb-3 flex items-center justify-between text-sm font-bold">
-                  <span>{status.assignmentId === assignmentId ? status.message : "Preparing job"}</span>
-                  <span>{status.assignmentId === assignmentId ? status.progress : 8}%</span>
+              )}
+              {status.error && status.error !== assignment.lastError && (
+                <div className="mt-3 rounded-2xl bg-danger/5 p-4 border border-danger/10 text-left w-full max-w-lg dark:bg-danger/10 dark:border-danger/20">
+                  <p className="text-xs font-mono text-danger break-words leading-relaxed">
+                    {status.error}
+                  </p>
                 </div>
-                <div className="h-3 overflow-hidden rounded-full bg-neutral-200 dark:bg-white/10">
-                  <motion.div
-                    className="h-full rounded-full bg-gradient-to-r from-ember to-saffron"
-                    initial={{ width: 0 }}
-                    animate={{ width: `${status.assignmentId === assignmentId ? status.progress : 8}%` }}
-                    transition={{ duration: 0.45 }}
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                {stageLabels.map((item) => {
-                  const currentIndex = stageLabels.findIndex((stage) => stage.stage === status.stage);
-                  const itemIndex = stageLabels.findIndex((stage) => stage.stage === item.stage);
-                  const complete = itemIndex < currentIndex || status.stage === "completed";
-                  const active = item.stage === status.stage && status.stage !== "completed";
-
-                  return (
-                    <div
-                      key={item.stage}
-                      className="flex items-center gap-4 rounded-2xl border border-line-soft bg-white p-4 dark:border-white/10 dark:bg-white/5"
-                    >
-                      <span className="grid h-10 w-10 place-items-center rounded-full bg-neutral-100 text-neutral-500 dark:bg-white/10 dark:text-neutral-300">
-                        {complete ? (
-                          <CheckCircle2 className="h-5 w-5 text-success" />
-                        ) : active ? (
-                          <Loader2 className="h-5 w-5 animate-spin text-ember" />
-                        ) : (
-                          <CircleDashed className="h-5 w-5" />
-                        )}
-                      </span>
-                      <div>
-                        <p className="font-bold">{item.label}</p>
-                        <p className="text-sm text-neutral-500 dark:text-neutral-300">
-                          {complete ? "Finished" : active ? "In progress" : "Waiting"}
-                        </p>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              {paper || status.stage === "completed" ? (
-                <Link href={`/assignments/${assignmentId}/paper`} className="mt-7 inline-flex">
-                  <Button>
-                    <FileText className="h-4 w-4" />
-                    View Paper
+              )}
+              <div className="mt-8 flex flex-col justify-center gap-3 w-full sm:flex-row sm:w-auto">
+                <Link href="/create">
+                  <Button variant="secondary" className="w-full sm:w-auto">
+                    Adjust Brief
                   </Button>
                 </Link>
-              ) : null}
-            </div>
-          </section>
+                <Button onClick={handleRegenerate} loading={isRegenerating} className="w-full sm:w-auto">
+                  <RotateCcw className="mr-2 h-4 w-4" />
+                  Retry Generation
+                </Button>
+              </div>
+            </section>
+          ) : (
+            <section className="overflow-hidden rounded-3xl bg-white shadow-sm dark:bg-[#232323]">
+              <div className="bg-ink p-6 text-white dark:bg-white dark:text-ink sm:p-8">
+                <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-sm font-semibold opacity-70">VedaAI generation pipeline</p>
+                    <h2 className="mt-2 text-2xl font-black sm:text-3xl">{assignment.title}</h2>
+                    <p className="mt-2 text-sm opacity-70">
+                      {assignment.subject} · {assignment.grade}
+                    </p>
+                  </div>
+                  <ProgressOrb progress={status.assignmentId === assignmentId ? status.progress : 8} />
+                </div>
+              </div>
+
+              <div className="p-6 sm:p-8">
+                <div className="mb-8 rounded-3xl bg-neutral-50 p-4 dark:bg-white/6">
+                  <div className="mb-3 flex items-center justify-between text-sm font-bold">
+                    <span>{status.assignmentId === assignmentId ? status.message : "Preparing job"}</span>
+                    <span>{status.assignmentId === assignmentId ? status.progress : 8}%</span>
+                  </div>
+                  <div className="h-3 overflow-hidden rounded-full bg-neutral-200 dark:bg-white/10">
+                    <motion.div
+                      className="h-full rounded-full bg-gradient-to-r from-ember to-saffron"
+                      initial={{ width: 0 }}
+                      animate={{ width: `${status.assignmentId === assignmentId ? status.progress : 8}%` }}
+                      transition={{ duration: 0.45 }}
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  {stageLabels.map((item) => {
+                    const currentIndex = stageLabels.findIndex((stage) => stage.stage === status.stage);
+                    const itemIndex = stageLabels.findIndex((stage) => stage.stage === item.stage);
+                    const complete = itemIndex < currentIndex || status.stage === "completed";
+                    const active = item.stage === status.stage && status.stage !== "completed";
+
+                    return (
+                      <div
+                        key={item.stage}
+                        className="flex items-center gap-4 rounded-2xl border border-line-soft bg-white p-4 dark:border-white/10 dark:bg-white/5"
+                      >
+                        <span className="grid h-10 w-10 place-items-center rounded-full bg-neutral-100 text-neutral-500 dark:bg-white/10 dark:text-neutral-300">
+                          {complete ? (
+                            <CheckCircle2 className="h-5 w-5 text-success" />
+                          ) : active ? (
+                            <Loader2 className="h-5 w-5 animate-spin text-ember" />
+                          ) : (
+                            <CircleDashed className="h-5 w-5" />
+                          )}
+                        </span>
+                        <div>
+                          <p className="font-bold">{item.label}</p>
+                          <p className="text-sm text-neutral-500 dark:text-neutral-300">
+                            {complete ? "Finished" : active ? "In progress" : "Waiting"}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {paper || status.stage === "completed" ? (
+                  <Link href={`/assignments/${assignmentId}/paper`} className="mt-7 inline-flex">
+                    <Button>
+                      <FileText className="h-4 w-4" />
+                      View Paper
+                    </Button>
+                  </Link>
+                ) : null}
+              </div>
+            </section>
+          )}
 
           <aside className="space-y-5">
             <div className="rounded-3xl bg-white p-5 shadow-sm dark:bg-[#232323]">

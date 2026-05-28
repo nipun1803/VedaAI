@@ -40,6 +40,7 @@ export interface AssignmentDraft {
 export interface Assignment extends AssignmentDraft {
   id: string;
   status: AssignmentStatus;
+  lastError?: string;
   createdAt: string;
   updatedAt: string;
 }

@@ -60,7 +60,7 @@ export async function loginTeacher(input: LoginInput) {
 
 interface RegisterInput {
   email: string;
-  password: any;
+  password: string;
   name: string;
   schoolName: string;
 }

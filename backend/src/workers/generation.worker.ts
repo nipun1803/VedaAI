@@ -6,6 +6,7 @@ import { generateQuestionPaperWithGroq } from "@/services/ai/groq.service.js";
 import { upsertGeneratedPaper } from "@/services/generatedPaper.service.js";
 import { enqueuePdfGeneration, QUESTION_QUEUE_NAME, type GenerationJobData } from "@/queues/generation.queue.js";
 import { publishGenerationUpdate } from "@/sockets/progressChannel.js";
+import { invalidateAssignment, invalidateTeacherAssignments } from "@/services/cache.service.js";
 
 export function createGenerationWorker() {
   return new Worker<GenerationJobData>(
@@ -34,6 +35,10 @@ export function createGenerationWorker() {
         assignment.status = "generating";
         assignment.lastError = undefined;
         await assignment.save();
+        
+        // Invalidate caching on status transition to 'generating'
+        await invalidateAssignment(assignmentId);
+        await invalidateTeacherAssignments(assignment.teacherId);
 
         await job.updateProgress(58);
         await publishGenerationUpdate({
@@ -68,10 +73,15 @@ export function createGenerationWorker() {
           paperId: paper._id.toString()
         };
       } catch (error) {
-        await AssignmentModel.findByIdAndUpdate(assignmentId, {
+        const assignment = await AssignmentModel.findByIdAndUpdate(assignmentId, {
           status: "failed",
           lastError: error instanceof Error ? error.message : String(error)
         });
+
+        if (assignment) {
+          await invalidateAssignment(assignmentId);
+          await invalidateTeacherAssignments(assignment.teacherId);
+        }
 
         await JobModel.findOneAndUpdate(
           { bullJobId: job.id, queueName: QUESTION_QUEUE_NAME },
@@ -98,4 +108,3 @@ export function createGenerationWorker() {
     }
   );
 }
-

@@ -53,7 +53,7 @@ export function PaperClient({ assignmentId }: { assignmentId: string }) {
     if (!paper) return;
     setIsExporting(true);
     try {
-      if (!isDemoMode) {
+      try {
         const blob = await downloadAssignmentPdfRequest(assignmentId);
         const url = URL.createObjectURL(blob);
         const anchor = document.createElement("a");
@@ -62,11 +62,14 @@ export function PaperClient({ assignmentId }: { assignmentId: string }) {
         anchor.click();
         URL.revokeObjectURL(url);
         toast.success("PDF downloaded");
-        return;
+      } catch (err) {
+        console.warn("Server PDF export failed or unreachable, generating client-side:", err);
+        await exportPaperAsPdf(paper);
+        toast.success("PDF generated locally");
       }
-
-      await exportPaperAsPdf(paper);
-      toast.success("PDF downloaded");
+    } catch (fallbackErr) {
+      console.error("Local PDF generation failed:", fallbackErr);
+      toast.error("Could not export PDF");
     } finally {
       setIsExporting(false);
     }
@@ -116,6 +119,36 @@ export function PaperClient({ assignmentId }: { assignmentId: string }) {
             <Link href="/create" className="mt-5 inline-block">
               <Button>Create Assignment</Button>
             </Link>
+          </div>
+        </div>
+      ) : assignment.status === "failed" ? (
+        <div className="mx-auto max-w-2xl rounded-[32px] border border-danger/10 bg-white p-8 text-center shadow-card dark:border-white/10 dark:bg-[#232323] dark:text-white sm:p-12 mt-10">
+          <div className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-danger/10 text-danger mb-6 dark:bg-danger/25">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-8 h-8">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+            </svg>
+          </div>
+          <h2 className="text-2xl font-black text-ink dark:text-white">Generation Failed</h2>
+          <p className="mt-3 text-sm text-neutral-500 dark:text-neutral-400">
+            We encountered an unexpected error while generating the question paper.
+          </p>
+          {assignment.lastError && (
+            <div className="mt-5 rounded-2xl bg-danger/5 p-4 border border-danger/10 text-left dark:bg-danger/10 dark:border-danger/20">
+              <p className="text-xs font-mono text-danger break-words leading-relaxed">
+                {assignment.lastError}
+              </p>
+            </div>
+          )}
+          <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
+            <Link href="/">
+              <Button variant="secondary" className="w-full sm:w-auto">
+                Go to Dashboard
+              </Button>
+            </Link>
+            <Button onClick={handleRegenerate} className="w-full sm:w-auto">
+              <RefreshCw className="mr-2 h-4 w-4" />
+              Regenerate Paper
+            </Button>
           </div>
         </div>
       ) : !paper ? (

@@ -15,6 +15,11 @@ export function getSocket() {
       transports: ["websocket"],
       autoConnect: false,
       withCredentials: true,
+      reconnection: true,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
+      randomizationFactor: 0.5,
       auth: (cb) => {
         const token = useAuthStore.getState().token;
         cb({ token });

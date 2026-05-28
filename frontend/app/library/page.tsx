@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { FileText, MoreHorizontal, Search, Settings2 } from "lucide-react";
+import { FileText, Search, Settings2 } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -117,7 +117,7 @@ export default function LibraryPage() {
                         <TableCell>{assignment.subject}</TableCell>
                         <TableCell>{assignment.grade}</TableCell>
                         <TableCell>
-                          <StatusBadge status={assignment.status as any} />
+                          <StatusBadge status={assignment.status as "draft" | "queued" | "generating" | "completed" | "failed"} />
                         </TableCell>
                         <TableCell className="text-muted-foreground text-sm">
                           {new Date(assignment.createdAt).toLocaleDateString()}

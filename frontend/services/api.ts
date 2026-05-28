@@ -34,6 +34,20 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      if (typeof window !== "undefined") {
+        console.warn("Unauthorized request detected (401). Clearing stale session.");
+        window.localStorage.removeItem("vedai-auth-store");
+        window.location.href = "/login";
+      }
+    }
+    return Promise.reject(error);
+  }
+);
+
 export async function createAssignmentRequest(payload: AssignmentDraft) {
   const { data } = await api.post<ApiResponse<{ assignment: Assignment }>>("/assignments", payload);
   return data.data.assignment;
@@ -80,5 +94,35 @@ export async function getJobStatusRequest(assignmentId: string) {
   const { data } = await api.get<ApiResponse<{ status: string; progress: number; message: string; stage: string }>>(
     `/jobs/assignments/${assignmentId}/status`
   );
+  return data.data;
+}
+
+export interface StudentGroup {
+  id: string;
+  name: string;
+  studentsCount: number;
+  teacherId: string;
+  isArchived: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export async function listGroupsRequest(archived = false) {
+  const { data } = await api.get<ApiResponse<{ groups: StudentGroup[] }>>(`/groups?archived=${archived}`);
+  return data.data.groups;
+}
+
+export async function createGroupRequest(payload: { name: string; studentsCount?: number }) {
+  const { data } = await api.post<ApiResponse<{ group: StudentGroup }>>("/groups", payload);
+  return data.data.group;
+}
+
+export async function toggleGroupArchiveRequest(id: string) {
+  const { data } = await api.post<ApiResponse<{ group: StudentGroup }>>(`/groups/${id}/toggle-archive`);
+  return data.data.group;
+}
+
+export async function deleteGroupRequest(id: string) {
+  const { data } = await api.delete<ApiResponse<{ success: boolean; message: string }>>(`/groups/${id}`);
   return data.data;
 }
