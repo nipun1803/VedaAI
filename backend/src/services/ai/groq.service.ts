@@ -66,7 +66,7 @@ export async function generateQuestionPaperWithGroq(
                 }
               ],
               temperature: 0.7,
-              max_tokens: 8192,
+              max_tokens: 3072,
               top_p: 0.95,
               response_format: { type: "json_object" }
             },
