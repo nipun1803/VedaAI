@@ -22,29 +22,7 @@ function parseCookies(cookieHeader: string | undefined): Record<string, string> 
 export function initSocket(server: HttpServer) {
   io = new Server(server, {
     cors: {
-      origin(origin, callback) {
-        if (!origin) {
-          callback(null, true);
-          return;
-        }
-        const normalizedFrontend = env.FRONTEND_URL.replace(/\/$/, "");
-        const allowedOrigins = new Set([normalizedFrontend, "http://localhost:3000", "http://localhost:3001"]);
-        
-        if (allowedOrigins.has(origin)) {
-          callback(null, true);
-          return;
-        }
-
-        const isVercelPreview = origin.endsWith(".vercel.app") && 
-          (origin.includes("veda") || origin.includes("nipun1803"));
-        
-        if (isVercelPreview) {
-          callback(null, true);
-          return;
-        }
-
-        callback(null, false);
-      },
+      origin: [env.FRONTEND_URL, "http://localhost:3000", "http://localhost:3001"],
       credentials: true
     }
   });

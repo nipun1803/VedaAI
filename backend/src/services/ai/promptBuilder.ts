@@ -13,7 +13,10 @@ export function buildQuestionPaperPrompt(assignment: AssignmentDocument) {
   let fileContextSnippet = "";
   
   if (assignment.fileContext && assignment.fileContext.trim().length > 0) {
-    fileContextSnippet = `\nReference Material for Context:\n\"\"\"\n${sanitizeInstructions(assignment.fileContext)}\n\"\"\"\n`;
+    const cappedContext = assignment.fileContext.length > 6000
+      ? assignment.fileContext.substring(0, 6000) + "\n... [truncated to fit model token limits] ..."
+      : assignment.fileContext;
+    fileContextSnippet = `\nReference Material for Context:\n\"\"\"\n${sanitizeInstructions(cappedContext)}\n\"\"\"\n`;
   }
 
   return `You are VedaAI, an expert school assessment designer.

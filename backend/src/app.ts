@@ -12,10 +12,7 @@ import { BullMQAdapter } from "@bull-board/api/bullMQAdapter";
 import { ExpressAdapter } from "@bull-board/express";
 import { questionGenerationQueue, pdfGenerationQueue } from "@/queues/generation.queue.js";
 
-const getNormalizedOrigins = () => {
-  const normalizedFrontend = env.FRONTEND_URL.replace(/\/$/, "");
-  return new Set([normalizedFrontend, "http://localhost:3000", "http://localhost:3001"]);
-};
+const allowedOrigins = new Set([env.FRONTEND_URL, "http://localhost:3000", "http://localhost:3001"]);
 
 export function createApp() {
   const app = express();
@@ -38,27 +35,11 @@ export function createApp() {
   app.use(
     cors({
       origin(origin, callback) {
-        if (!origin) {
+        if (!origin || allowedOrigins.has(origin)) {
           callback(null, true);
           return;
         }
-
-        const allowedOrigins = getNormalizedOrigins();
-        if (allowedOrigins.has(origin)) {
-          callback(null, true);
-          return;
-        }
-
-        // Support Vercel Preview Deployments dynamically
-        const isVercelPreview = origin.endsWith(".vercel.app") && 
-          (origin.includes("veda") || origin.includes("nipun1803"));
-        
-        if (isVercelPreview) {
-          callback(null, true);
-          return;
-        }
-
-        callback(null, false);
+        callback(new Error(`Origin ${origin} is not allowed by CORS`));
       },
       credentials: true
     })
