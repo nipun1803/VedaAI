@@ -8,6 +8,7 @@ interface JwtPayload {
   email: string;
   name: string;
   schoolName: string;
+  role: string;
 }
 
 function parseCookies(cookieHeader: string | undefined): Record<string, string> {
@@ -42,7 +43,8 @@ export const requireAuth: RequestHandler = (req, _res, next) => {
       id: payload.sub,
       email: payload.email,
       name: payload.name,
-      schoolName: payload.schoolName
+      schoolName: payload.schoolName,
+      role: payload.role
     };
     next();
   } catch {
