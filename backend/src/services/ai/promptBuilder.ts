@@ -13,8 +13,8 @@ export function buildQuestionPaperPrompt(assignment: AssignmentDocument) {
   let fileContextSnippet = "";
   
   if (assignment.fileContext && assignment.fileContext.trim().length > 0) {
-    const cappedContext = assignment.fileContext.length > 6000
-      ? assignment.fileContext.substring(0, 6000) + "\n... [truncated to fit model token limits] ..."
+    const cappedContext = assignment.fileContext.length > 4000
+      ? assignment.fileContext.substring(0, 4000) + "\n... [truncated to fit model token limits] ..."
       : assignment.fileContext;
     fileContextSnippet = `\nReference Material for Context:\n\"\"\"\n${sanitizeInstructions(cappedContext)}\n\"\"\"\n`;
   }
