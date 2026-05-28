@@ -61,6 +61,9 @@ const assignmentSchema = new Schema(
       type: String,
       trim: true
     },
+    fileContext: {
+      type: String
+    },
     dueDate: {
       type: Date,
       required: true,
