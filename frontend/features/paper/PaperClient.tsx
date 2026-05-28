@@ -212,8 +212,8 @@ export function PaperClient({ assignmentId }: { assignmentId: string }) {
               </section>
 
               <div className="mt-10 space-y-10">
-                {paper.sections.map((section) => (
-                  <section key={section.id}>
+                {paper.sections.map((section, secIndex) => (
+                  <section key={section.id || secIndex}>
                     <div className="text-center">
                       <h2 className="text-lg font-black">{section.name}</h2>
                       <p className="mt-2 text-sm italic">{section.instruction}</p>
@@ -221,7 +221,7 @@ export function PaperClient({ assignmentId }: { assignmentId: string }) {
 
                     <ol className="mt-6 space-y-4">
                       {section.questions.map((question, index) => (
-                        <li key={question.id} className="grid gap-2 text-sm leading-6">
+                        <li key={`${section.id || secIndex}-q-${index}`} className="grid gap-2 text-sm leading-6">
                           <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
                             <span className="font-semibold">{index + 1}.</span>
                             <p className="flex-1">
@@ -237,7 +237,7 @@ export function PaperClient({ assignmentId }: { assignmentId: string }) {
                           {question.options ? (
                             <div className="ml-0 grid gap-2 rounded-2xl bg-neutral-50 p-3 sm:ml-7 sm:grid-cols-2 dark:bg-white/5">
                               {question.options.map((option, optionIndex) => (
-                                <p key={option} className="text-xs">
+                                <p key={optionIndex} className="text-xs">
                                   {String.fromCharCode(65 + optionIndex)}. {option}
                                 </p>
                               ))}

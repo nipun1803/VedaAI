@@ -4,9 +4,9 @@ export const questionTypes = ["MCQ", "Short Answer", "Long Answer", "True/False"
 
 export const assignmentSchema = z
   .object({
-    title: z.string().trim().min(3, "Assignment title is required"),
-    subject: z.string().trim().min(2, "Subject is required"),
-    grade: z.string().trim().min(1, "Class / grade is required"),
+    title: z.string().min(3, "Assignment title is required"),
+    subject: z.string().min(2, "Subject is required"),
+    grade: z.string().min(1, "Class / grade is required"),
     dueDate: z.string().min(1, "Due date is required"),
     fileName: z.string().optional(),
     questionConfigs: z
