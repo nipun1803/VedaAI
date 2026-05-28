@@ -1,6 +1,6 @@
 # VedaAI 🛡️
 
-**VedaAI** is an enterprise-grade, high-performance AI Assessment Creator platform built for modern educators. It enables teachers to configure assessments, generate syllabus-aligned question papers utilizing advanced LLMs, stream real-time progression over WebSockets, manage student groups, and export beautifully formatted, print-ready PDFs.
+**VedaAI** is an enterprise-grade, high-performance AI Assessment Creator platform built for modern educators. It enables teachers to configure assessments, generate syllabus-aligned question papers utilizing advanced LLMs, process document/image uploads via OCR, stream real-time progression over WebSockets, manage student groups, and export beautifully formatted, print-ready PDFs.
 
 <p align="center">
   <strong>Decoupled, Resilient, Event-Driven Architecture for Digital Education</strong>
@@ -9,10 +9,27 @@
 <p align="center">
   <img src="https://img.shields.io/badge/build-passing-brightgreen.svg" alt="Build Status" />
   <img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License" />
-  <img src="https://img.shields.io/badge/PRs-welcome-blue.svg" alt="PRs Welcome" />
   <img src="https://img.shields.io/badge/React-19.0.0-61dafb.svg" alt="React 19" />
   <img src="https://img.shields.io/badge/Next.js-15.1.2-000000.svg" alt="Next.js 15" />
+  <img src="https://img.shields.io/badge/Node.js-22-339933.svg" alt="Node.js 22" />
+  <img src="https://img.shields.io/badge/MongoDB-Atlas-47A248.svg" alt="MongoDB" />
+  <img src="https://img.shields.io/badge/BullMQ-Workers-E34F26.svg" alt="BullMQ" />
 </p>
+
+---
+
+## 📑 Table of Contents
+- [✨ Features Spotlight](#-features-spotlight)
+- [🏗️ System Architecture & Data Flow](#️-system-architecture--data-flow)
+- [🚀 Architectural & Design Decisions](#-architectural--design-decisions)
+- [🛠️ Tech Stack](#️-tech-stack)
+- [📂 Project Structure](#-project-structure)
+- [🔑 Demo Access](#-demo-access)
+- [⚙️ Local Development Setup](#️-local-development-setup)
+- [🐳 Docker Orchestration](#-docker-orchestration)
+- [📡 API Mappings](#-api-mappings)
+- [🌍 Production Deployment Guide](#-production-deployment-guide)
+- [🔒 Security Hardening Status](#-security-hardening-status)
 
 ---
 
@@ -21,6 +38,7 @@
 | Feature | Tech | Benefit |
 | :--- | :--- | :--- |
 | **AI Assessment Generator** | Groq (`llama-3.3-70b-versatile`) | Builds verified, syllabus-aligned test papers in seconds. |
+| **Contextual OCR Uploads** | Groq Vision / LLM | Upload reference PDFs or images to act as syllabus context. |
 | **Decoupled Architecture** | BullMQ + Redis + Workers | Guaranteed backend uptime; no request timeouts during heavy LLM generation. |
 | **Real-time Live Stream** | Socket.io + Redis Pub/Sub | Streams step-by-step progress from queueing to generation directly to the client. |
 | **Multi-format PDF Generation**| pdf-lib (Server & Client side) | Generates pristine, print-ready PDFs with automatic pagination and margins. |
@@ -35,42 +53,98 @@ VedaAI is architected as a highly scalable, decoupled, multi-tier system. It sep
 ### Technical Architecture Diagram
 
 ```mermaid
-flowchart TD
-  Client["Next.js 15 Frontend"] <-->|Socket.io Real-time Streams| WS["Socket.io Server"]
-  Client -->|REST API Requests| API["Express API Server"]
-  API -->|Read/Write Operations| DB[("MongoDB (Mongoose)")]
-  API -->|Enqueue Jobs| Queue["BullMQ Queue"]
-  Queue <-->|Broker State Store| Redis[("Redis Database")]
-  Worker["BullMQ Background Workers"] <-->|Process Jobs| Queue
-  Worker -->|JSON System Prompts| Groq["Groq LLM Engine"]
-  Worker -->|Persistent State updates| DB
-  Worker -->|Socket Event Triggers| RedisPub["Redis Pub/Sub"]
-  RedisPub --> WS
+flowchart LR
+  %% Define Styles
+  classDef frontend fill:#3178c6,stroke:#fff,stroke-width:2px,color:#fff;
+  classDef backend fill:#4caf50,stroke:#fff,stroke-width:2px,color:#fff;
+  classDef database fill:#ff9800,stroke:#fff,stroke-width:2px,color:#fff;
+  classDef external fill:#9c27b0,stroke:#fff,stroke-width:2px,color:#fff;
+
+  subgraph Client [Frontend Tier]
+    UI["Next.js 15 UI"]:::frontend
+  end
+
+  subgraph Server [Backend Tier (Express.js)]
+    API["API Gateway & Routes"]:::backend
+    WS["Socket.io Server"]:::backend
+    Worker["BullMQ Background Workers"]:::backend
+  end
+
+  subgraph DataLayer [Data Layer]
+    DB[("MongoDB (Mongoose)")]:::database
+    Redis[("Redis (Pub/Sub & Cache)")]:::database
+    Queue["BullMQ Queue"]:::database
+  end
+
+  subgraph External [External Services]
+    Groq["Groq LLM Engine"]:::external
+    Vision["OCR / Vision API"]:::external
+  end
+
+  %% Connections
+  UI -->|REST API Requests| API
+  UI <-->|Real-time Streams| WS
+  API -->|Read/Write Operations| DB
+  API -->|Enqueue Jobs| Queue
+  Queue <-->|Broker State| Redis
+  Worker <-->|Process Jobs| Queue
+  Worker -->|Socket Event Triggers| Redis
+  Redis -->|Broadcasts| WS
+  Worker -->|Persistent State Updates| DB
+  Worker -->|JSON System Prompts| Groq
+  API -->|Upload Parsers| Vision
 ```
 
 ### End-to-End Data Pipeline
 
 ```mermaid
 sequenceDiagram
-  participant FE as Frontend
-  participant API as Express API
-  participant Q as BullMQ Queue
-  participant W as AI Worker
-  participant G as Groq LLM
-  participant DB as MongoDB
-  participant S as Socket.io
-  FE->>API: POST /api/assignments
-  API->>DB: Save assignment settings
-  API->>Q: Add question-generation job
-  Q->>W: Process queued job
-  W->>S: Stream: [queued/started] events
-  W->>G: Send structural JSON prompt
-  G-->>W: Return raw JSON response
-  W->>W: Extract and validate schema (4-stage pipeline)
-  W->>DB: Save generated paper
-  W->>Q: Enqueue PDF compile job
-  W->>DB: Save PDF buffer
-  W->>S: Stream: [completed] event
+  autonumber
+  actor T as Teacher
+  
+  box "Frontend Application" #F3F4F6
+    participant FE as Next.js UI
+  end
+  
+  box "Backend Services" #E0F2FE
+    participant API as Express API
+    participant W as AI Worker (BullMQ)
+    participant S as Socket.io
+  end
+
+  box "Data & AI" #FEF3C7
+    participant DB as MongoDB
+    participant G as Groq LLM
+  end
+
+  T->>FE: Configure assignment & attach files
+  FE->>API: POST /api/assignments (with contexts)
+  
+  rect rgb(240, 253, 244)
+    Note right of API: Phase 1: Initialization
+    API->>DB: Save assignment settings (Status: Queued)
+    API->>W: Enqueue Question Generation Job
+    API-->>FE: 201 Created (Assignment ID)
+    FE->>S: Subscribe to Assignment Room
+  end
+  
+  rect rgb(254, 252, 232)
+    Note right of W: Phase 2: AI Processing
+    W->>S: Broadcast: [Started] Event
+    W->>G: Send Structural JSON Prompt & File Context
+    G-->>W: Return Raw JSON Output
+    W->>W: Run 4-Stage Zod Validation Pipeline
+  end
+  
+  rect rgb(238, 242, 255)
+    Note right of W: Phase 3: Post-Processing & Export
+    W->>DB: Save generated Question Paper
+    W->>W: Compile structured PDF via pdf-lib
+    W->>DB: Save PDF buffer to Database
+    W->>DB: Update Assignment (Status: Completed)
+    W->>S: Broadcast: [Completed] Event
+    S-->>FE: Trigger UI update & confetti
+  end
 ```
 
 ---
@@ -219,6 +293,7 @@ REDIS_URL=redis://localhost:6379
 JWT_SECRET=replace-with-a-long-random-secret
 GROQ_API_KEY=
 GROQ_MODEL=llama-3.3-70b-versatile
+RUN_WORKERS_IN_PROCESS=false
 ```
 
 **Frontend:**
@@ -230,20 +305,22 @@ NEXT_PUBLIC_DEMO_MODE=true
 
 ---
 
-## Production Deployment Guide
+## 🌍 Production Deployment Guide
 
-VedaAI is deployed as an decoupled, multi-tier system. For a production deployment, prepare a **Frontend Web App**, a **Backend API Server**, and a **Background Worker Instance**, along with managed database servers.
+VedaAI is deployed as an decoupled, multi-tier system. For a production deployment, prepare a **Frontend Web App** and a **Backend API Server**, along with managed database servers.
 
 ### 1. Databases
 * **MongoDB**: Deploy a managed cluster using [MongoDB Atlas](https://www.mongodb.com/products/platform/atlas-database).
-* **Redis**: Provision high-performance Pub/Sub caching using [Redis Cloud](https://redis.io/cloud/) or [Upstash](https://upstash.com).
+* **Redis**: Provision high-performance Pub/Sub caching using [Upstash](https://upstash.com).
 
-### 2. API Server & BullMQ Worker (Railway / Render)
-Deploy two separate services from your `/backend` directory:
-1. **API Service**: Root: `backend`, Start: `npm run start`
-2. **Worker Service**: Root: `backend`, Start: `npm run start:worker` (Keep internal/no public domains)
+### 2. API Server & Workers (Render / Railway)
+Deploy the backend directory as a Web Service. By default, VedaAI requires two separate processes (API and Worker), but for a free-tier compatible setup (like Render's Free Web Service), you can run them in the same process using `RUN_WORKERS_IN_PROCESS=true`.
 
-**Required Env variables**:
+* **Root Directory**: `backend`
+* **Build Command**: `npm install && npm run build`
+* **Start Command**: `npm run start`
+
+**Required Environment Variables**:
 ```env
 NODE_ENV=production
 PORT=4000
@@ -251,18 +328,18 @@ FRONTEND_URL=https://your-veda-frontend.vercel.app
 MONGODB_URI=mongodb+srv://...
 REDIS_URL=rediss://...
 JWT_SECRET=your-production-jwt-secret-key-32-chars
-JWT_EXPIRES_IN=7d
 GROQ_API_KEY=gsk_...
-GROQ_MODEL=llama-3.3-70b-versatile
+RUN_WORKERS_IN_PROCESS=true
 ```
 
 ### 3. Frontend App (Vercel)
 Point your Vercel project to the `/frontend` root and add the backend variables:
 ```env
-NEXT_PUBLIC_API_URL=https://your-backend-api.railway.app/api
-NEXT_PUBLIC_SOCKET_URL=https://your-backend-api.railway.app
+NEXT_PUBLIC_API_URL=https://your-backend-api.onrender.com/api
+NEXT_PUBLIC_SOCKET_URL=https://your-backend-api.onrender.com
 NEXT_PUBLIC_DEMO_MODE=false
 ```
+*Note: Make sure to update the backend's `FRONTEND_URL` environment variable with your Vercel URL once deployed to avoid CORS blocks.*
 
 ---
 
