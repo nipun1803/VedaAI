@@ -60,23 +60,23 @@ flowchart LR
   classDef database fill:#ff9800,stroke:#fff,stroke-width:2px,color:#fff;
   classDef external fill:#9c27b0,stroke:#fff,stroke-width:2px,color:#fff;
 
-  subgraph Client [Frontend Tier]
+  subgraph Client ["Frontend Tier"]
     UI["Next.js 15 UI"]:::frontend
   end
 
-  subgraph Server [Backend Tier (Express.js)]
+  subgraph Server ["Backend Tier (Express.js)"]
     API["API Gateway & Routes"]:::backend
     WS["Socket.io Server"]:::backend
     Worker["BullMQ Background Workers"]:::backend
   end
 
-  subgraph DataLayer [Data Layer]
+  subgraph DataLayer ["Data Layer"]
     DB[("MongoDB (Mongoose)")]:::database
     Redis[("Redis (Pub/Sub & Cache)")]:::database
     Queue["BullMQ Queue"]:::database
   end
 
-  subgraph External [External Services]
+  subgraph External ["External Services"]
     Groq["Groq LLM Engine"]:::external
     Vision["OCR / Vision API"]:::external
   end
