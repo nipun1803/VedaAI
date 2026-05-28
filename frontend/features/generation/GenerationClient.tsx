@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Bot, CheckCircle2, CircleDashed, FileText, Loader2, RotateCcw } from "lucide-react";
@@ -35,6 +36,7 @@ export function GenerationClient({ assignmentId }: { assignmentId: string }) {
   const setGenerationStatus = useAssignmentStore((state) => state.setGenerationStatus);
   const [isFetchingRemote, setIsFetchingRemote] = useState(false);
   const [isRegenerating, setIsRegenerating] = useState(false);
+  const router = useRouter();
 
   useSocketBridge(assignmentId);
   useGenerationSimulator(assignmentId);
@@ -93,6 +95,25 @@ export function GenerationClient({ assignmentId }: { assignmentId: string }) {
       })
       .finally(() => setIsFetchingRemote(false));
   }, [assignment, assignmentId, mounted, saveAssignment, savePaper]);
+
+  useEffect(() => {
+    if (!mounted || isDemoMode) return;
+
+    if (assignment?.status === "completed" || status.stage === "completed") {
+      if (!paper) {
+        setIsFetchingRemote(true);
+        getAssignmentRequest(assignmentId)
+          .then((data) => {
+            saveAssignment(data.assignment);
+            if (data.paper) savePaper(data.paper);
+            router.replace(`/assignments/${assignmentId}/paper`);
+          })
+          .finally(() => setIsFetchingRemote(false));
+      } else {
+        router.replace(`/assignments/${assignmentId}/paper`);
+      }
+    }
+  }, [assignment?.status, status.stage, paper, assignmentId, mounted, router, saveAssignment, savePaper]);
 
   useEffect(() => {
     if (!mounted || isDemoMode) return;
