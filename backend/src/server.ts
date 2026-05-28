@@ -20,8 +20,9 @@ async function bootstrap() {
   let generationWorker: any = null;
   let pdfWorker: any = null;
 
-  // Run BullMQ workers in-process in development unless explicitly disabled via environment
-  const runWorkers = env.NODE_ENV === "development" && process.env.DISABLE_IN_PROCESS_WORKERS !== "true";
+  // Run BullMQ workers in-process in development by default, or if explicitly enabled in production
+  const runWorkers = (env.NODE_ENV === "development" && process.env.DISABLE_IN_PROCESS_WORKERS !== "true") || 
+                     (process.env.RUN_WORKERS_IN_PROCESS === "true");
 
   if (runWorkers) {
     generationWorker = createGenerationWorker();
