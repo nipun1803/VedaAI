@@ -46,10 +46,10 @@ export function createApp() {
   );
   app.use(express.json({ limit: "2mb" }));
   app.use(requestLogger);
-  
+
   app.use("/api/admin/queues", serverAdapter.getRouter());
   app.use("/api", apiRateLimiter, apiRouter);
-  
+
   app.use(notFound);
   app.use(errorHandler);
 

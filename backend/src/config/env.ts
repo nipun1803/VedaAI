@@ -14,7 +14,7 @@ const envSchema = z.object({
   DEMO_NAME: z.string().default("John Doe"),
   DEMO_SCHOOL: z.string().default("Delhi Public School, Sector-4, Bokaro"),
   GROQ_API_KEY: z.string().optional(),
-  GROQ_MODEL: z.string().default("llama-3.3-70b-versatile"),
+  GROQ_MODEL: z.string().default("llama-3.1-8b-instant"),
   AI_TIMEOUT_MS: z.coerce.number().default(60000),
   AI_MAX_RETRIES: z.coerce.number().default(2)
 });
